@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Claude Usage — Layla Care Engineering</title>
+  <style>
+    :root {
+      --bg: #f5f5f4; --surface: #fff; --border: #e7e5e4;
+      --text: #1c1917; --muted: #78716c;
+      --sonnet: #378ADD; --opus: #185FA5; --haiku: #85B7EB; --fable: #D4537E;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1c1917; --surface: #292524; --border: #44403c;
+        --text: #fafaf9; --muted: #a8a29e;
+      }
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 15px;
+    }
+
+    .page { padding: 36px 40px; }
+
+    h1 { font-size: 26px; font-weight: 700; letter-spacing: -.4px; }
+    .sub { font-size: 14px; color: var(--muted); margin-top: 4px; margin-bottom: 28px; }
+
+    /* Stat cards */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+    }
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .7px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .stat-value { font-size: 32px; font-weight: 700; letter-spacing: -.8px; line-height: 1; }
+    .stat-sub { font-size: 12px; color: var(--muted); margin-top: 5px; }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 22px 24px;
+      margin-bottom: 16px;
+    }
+    .card-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+
+    .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+    .leg { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+    .leg-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+    /* Fixed-height chart wrapper — critical to stop Chart.js infinite growth */
+    .chart-box { position: relative; height: 280px; width: 100%; }
+
+    .two {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    footer { font-size: 12px; color: var(--muted); text-align: center; margin-top: 20px; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Claude API Usage</h1>
+  <p class="sub">Layla Care Engineering · Jan – Jun 2026</p>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">Total Tokens</div>
+      <div class="stat-value">9.35B</div>
+      <div class="stat-sub">across all models</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Peak Month</div>
+      <div class="stat-value">3.15B</div>
+      <div class="stat-sub">Jun 2026</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Team Members</div>
+      <div class="stat-value">9</div>
+      <div class="stat-sub">peak 9 in Apr</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Top Model</div>
+      <div class="stat-value">Sonnet</div>
+      <div class="stat-sub">63% of tokens</div>
+    </div>
+  </div>
+
+  <!-- Stacked bar -->
+  <div class="card">
+    <div class="card-title">Monthly Token Volume by Model Tier</div>
+    <div class="legend">
+      <div class="leg"><div class="leg-dot" style="background:var(--sonnet)"></div>Sonnet</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--opus)"></div>Opus</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--haiku)"></div>Haiku</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--fable)"></div>Fable</div>
+    </div>
+    <div class="chart-box"><canvas id="barChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Daily Token Volume</div>
+    <div class="chart-box"><canvas id="lineChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Usage by Team Member</div>
+    <div class="chart-box"><canvas id="memberChart"></canvas></div>
+  </div>
+
+  <footer>Data sourced from Anthropic usage exports · Generated Jun 30, 2026</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const M = ["Jan","Feb","Mar","Apr","May","Jun"];
+const haiku  = [6971865, 35497361, 117436305, 316975385, 229307969, 185118812];
+const sonnet = [143432767, 777483113, 889331830, 1912434665, 1035495512, 1140564012];
+const opus   = [9101, 30141872, 26767150, 62011216, 613111354, 1798592366];
+const fable  = [0, 0, 0, 0, 0, 30160636];
+
+const dailyL = ["Jan 12","Jan 21","Jan 28","Feb 5","Feb 13","Feb 21","Mar 1","Mar 9","Mar 16","Mar 24","Apr 1","Apr 9","Apr 15","Apr 22","Apr 28","May 6","May 12","May 19","May 26","Jun 1","Jun 4","Jun 8","Jun 15","Jun 22","Jun 30"];
+const dailyV = [704683,7959373,48295715,95788975,240569636,33956534,4622794,16322022,58888804,33073882,72909759,73676079,158060774,198696682,216494792,85502493,127038762,160075602,206634618,120491785,347330523,228092974,140958700,178436615,58767592];
+
+const users = ["chris","cenxiao","asheesh","arthur","drew","helee","haruka","michael","raul"];
+const uTok  = [4080510868,1922016293,1331975482,1253840197,292431307,250672860,150648970,50471702,1871111];
+
+function fmtB(n) {
+  if (n >= 1e9) return (n/1e9).toFixed(1)+'B';
+  if (n >= 1e6) return (n/1e6).toFixed(0)+'M';
+  return (n/1e3).toFixed(0)+'K';
+}
+
+const s = getComputedStyle(document.documentElement);
+const muted  = s.getPropertyValue('--muted').trim()  || '#78716c';
+const border = s.getPropertyValue('--border').trim() || '#e7e5e4';
+
+const baseScales = {
+  x: { grid:{ color: border }, ticks:{ color: muted, font:{ size:12 } } },
+  y: { grid:{ color: border }, ticks:{ color: muted, font:{ size:12 }, callback: v => fmtB(v) }, beginAtZero:true },
+};
+
+// Monthly stacked bar
+new Chart(document.getElementById('barChart'), {
+  type: 'bar',
+  data: {
+    labels: M,
+    datasets: [
+      { label:'Sonnet', data: sonnet, backgroundColor:'#378ADD', borderRadius:3, borderSkipped:false },
+      { label:'Opus',   data: opus,   backgroundColor:'#185FA5', borderRadius:3, borderSkipped:false },
+      { label:'Haiku',  data: haiku,  backgroundColor:'#85B7EB', borderRadius:3, borderSkipped:false },
+      { label:'Fable',  data: fable,  backgroundColor:'#D4537E', borderRadius:3, borderSkipped:false },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    plugins: { legend:{ display:false }, tooltip:{ callbacks:{ label: ctx => ` ${ctx.dataset.label}: ${fmtB(ctx.parsed.y)}` } } },
+    scales: {
+      x: { ...baseScales.x, stacked: true },
+      y: { ...baseScales.y, stacked: true },
+    }
+  }
+});
+
+// Daily line
+new Chart(document.getElementById('lineChart'), {
+  type: 'line',
+  data: {
+    labels: dailyL,
+    datasets: [{ label:'Tokens', data: dailyV, borderColor:'#378ADD', borderWidth:2,
+      pointRadius:3, pointBackgroundColor:'#378ADD', fill:false, tension:0.3 }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    plugins: { legend:{ display:false }, tooltip:{ callbacks:{ label: ctx => ' ' + fmtB(ctx.parsed.y) } } },
+    scales: baseScales
+  }
+});
+
+// Member horizontal bar
+new Chart(document.getElementById('memberChart'), {
+  type: 'bar',
+  data: {
+    labels: users,
+    datasets: [{ label:'Tokens', data: uTok,
+      backgroundColor:['#378ADD','#185FA5','#85B7EB','#6366F1','#10B981','#F59E0B','#D4537E','#8B5CF6','#78716c'],
+      borderRadius:3, borderSkipped:false }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    indexAxis: 'y',
+    plugins: { legend:{ display:false }, tooltip:{ callbacks:{ label: ctx => ' ' + fmtB(ctx.parsed.x) } } },
+    scales: {
+      x: { grid:{ color: border }, ticks:{ color: muted, font:{ size:12 }, callback: v => fmtB(v) }, beginAtZero:true },
+      y: { grid:{ display:false }, ticks:{ color: muted, font:{ size:12 } } },
+    }
+  }
+});
+</script>
+</body>
+</html>
